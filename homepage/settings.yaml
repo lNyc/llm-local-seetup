@@ -1,0 +1,15 @@
+---
+title: AI Stack
+theme: dark
+color: zinc
+headerStyle: clean
+layout:
+  AI:
+    style: row
+    columns: 3
+  Automation:
+    style: row
+    columns: 3
+  Infrastructure:
+    style: row
+    columns: 1

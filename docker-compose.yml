@@ -1,0 +1,158 @@
+name: ai-stack
+
+include:
+  - compose/observability.yml
+  - compose/web-chat.yml  
+
+networks:
+  ai-net:
+    driver: bridge
+
+volumes:
+  ollama-data:
+  n8n-data:
+  neo4j-data:
+  neo4j-logs:
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # OLLAMA  — local inference engine
+  # Modelfile sets coding defaults (temp 0.6, presence_penalty 0)
+  # ──────────────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    profiles:
+      - core
+    networks:
+      - ai-net
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./modelfiles:/modelfiles
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_API_KEY=${OLLAMA_API_KEY}
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=30m
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_KV_CACHE_TYPE=q8_0
+      - OLLAMA_GPU_OVERHEAD=576716800
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ──────────────────────────────────────────────────────────
+  # OLLAMA INIT  — pulls model and creates Modelfile on first run
+  # ──────────────────────────────────────────────────────────
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: ollama-init
+    restart: "no"
+    profiles:
+      - core
+    networks:
+      - ai-net
+    volumes:
+      - ./modelfiles:/modelfiles
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    depends_on:
+      - ollama
+    entrypoint: /bin/sh
+    command: >
+      -c "
+      echo 'Waiting for Ollama to be ready...';
+      until ollama list > /dev/null 2>&1; do sleep 2; done;
+      echo 'Ollama is ready. Pulling qwen3.5:9b...';
+      ollama pull qwen3.5:9b;
+      echo 'Creating qwen3.5-code from Modelfile...';
+      ollama create qwen3.5-code -f /modelfiles/Modelfile.qwen3-5;
+      echo 'Done.';
+      "
+
+  # ──────────────────────────────────────────────────────────
+  # N8N  — workflow automation
+  # Points to LiteLLM for traced LLM calls
+  # ──────────────────────────────────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    networks:
+      - ai-net
+    ports:
+      - "15678:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_JWT_SECRET}
+      - OLLAMA_HOST=http://litellm:4000/v1
+
+  # ──────────────────────────────────────────────────────────
+  # NEO4J  — graph database for Graphify
+  # Push from host: graphify . --neo4j-push bolt://localhost:17687
+  # ──────────────────────────────────────────────────────────
+  neo4j:
+    image: neo4j:5
+    container_name: neo4j
+    restart: unless-stopped
+    networks:
+      - ai-net
+    ports:
+      - "17474:7474"
+      - "17687:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD}
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+
+  # ──────────────────────────────────────────────────────────
+  # SEARXNG  — local search engine for agents
+  # ──────────────────────────────────────────────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    profiles:
+      - core
+    networks:
+      - ai-net
+    ports:
+      - "18081:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:18081
+
+  # ──────────────────────────────────────────────────────────
+  # HOMEPAGE  — dashboard for all services
+  # Accessible on host :10000
+  # ──────────────────────────────────────────────────────────
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    networks:
+      - ai-net
+    ports:
+      - "10000:3000"
+    volumes:
+      - ./homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - HOMEPAGE_ALLOWED_HOSTS=localhost:10000

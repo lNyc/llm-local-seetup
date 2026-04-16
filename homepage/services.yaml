@@ -1,0 +1,52 @@
+---
+- AI:
+    - LibreChat:
+        icon: si-openai
+        href: http://localhost:18082
+        description: Chat interface
+        server: my-docker
+        container: librechat
+
+    - Langfuse:
+        icon: si-graphql
+        href: http://localhost:13000
+        description: LLM observability & tracing
+        server: my-docker
+        container: langfuse-web
+
+    - LiteLLM:
+        icon: si-fastapi
+        href: http://localhost:14000
+        description: LLM proxy gateway
+        server: my-docker
+        container: litellm
+
+- Automation:
+    - n8n:
+        icon: si-n8n
+        href: http://localhost:15678
+        description: Workflow automation
+        server: my-docker
+        container: n8n
+
+    - Neo4j:
+        icon: si-neo4j
+        href: http://localhost:17474
+        description: Graph database (Graphify)
+        server: my-docker
+        container: neo4j
+
+    - SearXNG:
+        icon: si-searxng
+        href: http://localhost:18081
+        description: Search engine for agents
+        server: my-docker
+        container: searxng
+
+- Infrastructure:
+    - Ollama:
+        icon: si-ollama
+        href: http://localhost:11434
+        description: Local inference engine
+        server: my-docker
+        container: ollama

@@ -1,0 +1,42 @@
+version: "1.3.8"
+
+# ──────────────────────────────────────────────────────────
+# LIBRECHAT CONFIGURATION
+# Defines AI endpoints and web search
+# ──────────────────────────────────────────────────────────
+
+endpoints:
+  agents:
+    capabilities:
+      - "execute_code"
+      - "tools"
+      - "actions"
+      - "file_search"
+      - "artifacts"
+      - "web_search"
+  custom:
+    - name: "Local AI"
+      apiKey: "${LITELLM_MASTER_KEY}"
+      baseURL: "http://litellm:4000/v1"
+      models:
+        default: ["qwen3.5-code", "qwen3.5"]
+        fetch: true
+      titleConvo: true
+      titleModel: "qwen3.5"
+      modelDisplayLabel: "Ollama"
+
+# ──────────────────────────────────────────────────────────
+# WEB SEARCH via SearXNG
+# SEARXNG_INSTANCE_URL must be set in .env
+# ──────────────────────────────────────────────────────────
+webSearch:
+  searchProvider: "searxng"
+  searxngInstanceUrl: "${SEARXNG_INSTANCE_URL}"
+  scraperProvider: "firecrawl"
+  firecrawlApiKey: "${FIRECRAWL_API_KEY}"
+  rerankerType: "jina"
+  jinaApiKey: "${JINA_API_KEY}"
+  safeSearch: 0
+
+interface:
+  webSearch: true

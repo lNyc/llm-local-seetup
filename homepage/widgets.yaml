@@ -1,0 +1,11 @@
+---
+- search:
+    provider: custom
+    url: http://localhost:18081/search?q=
+    target: _blank
+    placeholder: Search via SearXNG...
+
+- resources:
+    cpu: true
+    memory: true
+    disk: /

@@ -1,0 +1,115 @@
+name: ai-stack
+
+networks:
+  ai-net:
+    driver: bridge
+
+volumes:
+  librechat-mongodb-data:
+  librechat-meilisearch-data:
+  librechat-uploads:
+  librechat-images:
+
+services:
+
+  # ──────────────────────────────────────────────────────────
+  # LIBRECHAT  — chat UI with native Langfuse tracing
+  # Accessible on host :18082
+  # Routes LLM calls through LiteLLM (defined in librechat.yaml)
+  # Sends traces directly to Langfuse — no middleware needed
+  # ──────────────────────────────────────────────────────────
+  librechat:
+    image: ghcr.io/danny-avila/librechat:latest
+    container_name: librechat
+    restart: unless-stopped
+    networks:
+      - ai-net
+    ports:
+      - "18082:3080"
+    volumes:
+      - librechat-uploads:/app/uploads
+      - librechat-images:/app/client/public/images
+      - ./librechat/librechat.yaml:/app/librechat.yaml
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3080
+      - MONGO_URI=mongodb://librechat-mongodb:27017/LibreChat
+      - MEILI_HOST=http://librechat-meilisearch:7700
+      - MEILI_MASTER_KEY=${LIBRECHAT_MEILI_KEY:-meili-master-key}
+      - JWT_SECRET=${LIBRECHAT_JWT_SECRET}
+      - JWT_REFRESH_SECRET=${LIBRECHAT_JWT_REFRESH_SECRET}
+      - CREDS_KEY=${LIBRECHAT_CREDS_KEY}
+      - CREDS_IV=${LIBRECHAT_CREDS_IV}
+      - ALLOW_REGISTRATION=true
+      - SEARCH=true
+      # Langfuse native tracing — bypasses LiteLLM for observability
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY:-pk-lf-local}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY:-sk-lf-local}
+      - LANGFUSE_BASE_URL=http://langfuse-web:3000
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}   # ← add this
+      - SEARXNG_INSTANCE_URL=http://searxng:8080
+      - LIBRECHAT_CODE_BASEURL=http://librechat-code-interpreter:8000
+      - LIBRECHAT_CODE_API_KEY=${LIBRECHAT_CODE_API_KEY}
+      - FIRECRAWL_API_KEY=disabled
+      - JINA_API_KEY=disabled
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - librechat-mongodb
+      - librechat-meilisearch
+
+  # ──────────────────────────────────────────────────────────
+  # MONGODB  — LibreChat's database
+  # Stores conversations, users, presets, API keys
+  # ──────────────────────────────────────────────────────────
+  librechat-mongodb:
+    image: mongo:8.0
+    container_name: librechat-mongodb
+    restart: unless-stopped
+    networks:
+      - ai-net
+    volumes:
+      - librechat-mongodb-data:/data/db
+    command: mongod --noauth
+
+  # ──────────────────────────────────────────────────────────
+  # MEILISEARCH  — conversation search inside LibreChat
+  # ──────────────────────────────────────────────────────────
+  librechat-meilisearch:
+    image: getmeili/meilisearch:v1.12
+    container_name: librechat-meilisearch
+    restart: unless-stopped
+    networks:
+      - ai-net
+    volumes:
+      - librechat-meilisearch-data:/meili_data
+    environment:
+      - MEILI_MASTER_KEY=${LIBRECHAT_MEILI_KEY:-meili-master-key}
+      - MEILI_NO_ANALYTICS=true
+
+  librechat-code-interpreter:
+      image: ghcr.io/usnavy13/librecodeinterpreter:main
+      container_name: librechat-code-interpreter
+      restart: unless-stopped
+      networks:
+        - ai-net
+      ports:
+        - "18083:8000"
+      cap_add:
+        - SYS_ADMIN    # required for nsjail sandbox isolation
+      environment:
+        - API_KEY=${LIBRECHAT_CODE_API_KEY}
+        - MASTER_API_KEY=${LIBRECHAT_CODE_API_KEY}
+        - REDIS_HOST=langfuse-redis
+        - REDIS_PORT=6379
+        - REDIS_PASSWORD=${LANGFUSE_REDIS_PASSWORD:-langfuse-redis-secret}
+        - REDIS_DB=1    # use DB 1 to avoid colliding with Langfuse on DB 0
+        - MINIO_ENDPOINT=langfuse-minio:9000
+        - MINIO_ACCESS_KEY=minio
+        - MINIO_SECRET_KEY=${LANGFUSE_MINIO_PASSWORD:-miniosecret}
+        - MINIO_SECURE=false
+        - MINIO_BUCKET=code-interpreter-files
+        - LOG_LEVEL=DEBUG
+        - REPL_ENABLED=false
+        - SANDBOX_POOL_ENABLED=false
+        - ENABLE_HTTPS=false

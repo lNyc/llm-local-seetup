@@ -1,0 +1,28 @@
+model_list:
+  - model_name: qwen3.5-code
+    litellm_params:
+      model: ollama_chat/qwen3.5-code
+      api_base: http://ollama:11434
+      max_tokens: 16384
+      allowed_openai_params: ["presence_penalty", "temperature", "top_p", "top_k"]
+
+  - model_name: qwen3.5
+    litellm_params:
+      model: ollama_chat/qwen3.5:9b
+      api_base: http://ollama:11434
+      max_tokens: 16384
+      allowed_openai_params: ["presence_penalty", "temperature", "top_p", "top_k"]
+
+litellm_settings:
+  callbacks: ["langfuse"]
+  turn_off_message_logging: false
+  request_timeout: 600
+  default_team_settings:
+  - team_id: default
+    langfuse_session_header: X-OpenWebUI-Chat-Id
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  user_header_mappings:
+  - header_name: X-OpenWebUI-User-Id
+    litellm_user_role: internal_user
