@@ -19,11 +19,13 @@ endpoints:
       apiKey: "${LITELLM_MASTER_KEY}"
       baseURL: "http://litellm:4000/v1"
       models:
-        default: ["qwen3.5-code", "qwen3.5"]
+        default: ["qwen3.5-hybrid"]
         fetch: true
       titleConvo: true
       titleModel: "qwen3.5"
       modelDisplayLabel: "Ollama"
+      addParams:
+        max_tokens: 8192
 
 # ──────────────────────────────────────────────────────────
 # WEB SEARCH via SearXNG

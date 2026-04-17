@@ -1,0 +1,60 @@
+# ──────────────────────────────────────────────────────────
+# KOBOLDCPP  — Elypha's hybrid-cpp fork
+# Fixes hybrid/recurrent model checkpoint restore for Qwen3.5
+# Exposes OpenAI-compatible API on port 11435
+# Source: https://github.com/Elypha/hybrid-cpp
+# ──────────────────────────────────────────────────────────
+
+services:
+  koboldcpp:
+    build:
+      context: .
+      dockerfile: Dockerfile.koboldcpp
+    image: local/koboldcpp-hybrid:latest
+    container_name: koboldcpp
+    restart: unless-stopped
+    networks:
+      - ai-net
+    ports:
+      - "11435:5001"
+    volumes:
+      - ../models:/models
+      - ./koboldcpp/kcpp_adapters:/app/kcpp_adapters
+    command:
+      - --model
+      - /models/qwen3.5-9b-distilled-q5_k_m.gguf
+      - --port
+      - "5001"
+      - --host
+      - "0.0.0.0"
+      - --gpulayers
+      - "99"
+      - --contextsize
+      - "131072"
+      - --usecuda
+      - --skiplauncher
+      - --multiuser
+      - "1"
+      # Hybrid checkpoint pool — fixes recurrent state restore for Qwen3.5
+      # 64 slots × ~50MB = ~3.2GB RAM, checkpoint every 512 tokens
+      - --hybridcheckpointslots
+      - "64"
+      - --hybridcheckpointinterval
+      - "512"
+      - --chatcompletionsadapter
+      - /app/kcpp_adapters/ChatML.json
+      - --jinja
+      - --quantkv
+      - "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  ai-net:
+    external: true
+    name: ai-stack_ai-net

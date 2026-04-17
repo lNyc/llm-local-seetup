@@ -3,3 +3,179 @@
 [2026-04-16T00:15:31.359Z] info: proxmox.yaml was copied to the config folder
 [2026-04-16T00:15:31.364Z] info: custom.css was copied to the config folder
 [2026-04-16T00:15:31.365Z] info: custom.js was copied to the config folder
+[2026-04-17T04:07:10.609Z] error: <httpProxy> Error calling https://api.github.com/repos/gethomepage/homepage/releases...
+[2026-04-17T04:07:10.613Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN api.github.com
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'api.github.com'
+  }
+]
+[2026-04-17T04:07:10.617Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T04:07:10.617Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T04:07:15.611Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T04:07:15.612Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T04:07:18.375Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T04:07:18.376Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T05:12:37.715Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T05:12:37.722Z] error: <httpProxy> [
+  500,
+  Error: queryAaaa ENOTFOUND llama-server
+      at ignore-listed frames {
+    errno: undefined,
+    code: 'ENOTFOUND',
+    syscall: 'queryAaaa',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T05:12:37.728Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T05:12:37.729Z] error: <httpProxy> [
+  500,
+  Error: queryAaaa ENOTFOUND llama-server
+      at ignore-listed frames {
+    errno: undefined,
+    code: 'ENOTFOUND',
+    syscall: 'queryAaaa',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T05:12:38.619Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T05:12:38.622Z] error: <httpProxy> [
+  500,
+  Error: queryAaaa ENOTFOUND llama-server
+      at ignore-listed frames {
+    errno: undefined,
+    code: 'ENOTFOUND',
+    syscall: 'queryAaaa',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T05:12:38.627Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T05:12:38.628Z] error: <httpProxy> [
+  500,
+  Error: queryAaaa ENOTFOUND llama-server
+      at ignore-listed frames {
+    errno: undefined,
+    code: 'ENOTFOUND',
+    syscall: 'queryAaaa',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T14:38:20.027Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T14:38:20.031Z] error: <httpProxy> [
+  500,
+  Error: queryAaaa ENOTFOUND llama-server
+      at ignore-listed frames {
+    errno: undefined,
+    code: 'ENOTFOUND',
+    syscall: 'queryAaaa',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T14:38:20.137Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T14:38:20.138Z] error: <httpProxy> [
+  500,
+  Error: queryAaaa ENOTFOUND llama-server
+      at ignore-listed frames {
+    errno: undefined,
+    code: 'ENOTFOUND',
+    syscall: 'queryAaaa',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T19:00:06.968Z] error: <httpProxy> Error calling https://api.github.com/repos/gethomepage/homepage/releases...
+[2026-04-17T19:00:06.971Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN api.github.com
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'api.github.com'
+  }
+]
+[2026-04-17T19:00:06.994Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T19:00:06.995Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T19:00:11.981Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T19:00:11.982Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T19:00:22.013Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T19:00:22.014Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T19:00:30.206Z] error: <httpProxy> Error calling http://llama-server:8080/slots...
+[2026-04-17T19:00:30.207Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]
+[2026-04-17T19:00:30.208Z] error: <httpProxy> Error calling http://llama-server:8080/props...
+[2026-04-17T19:00:30.208Z] error: <httpProxy> [
+  500,
+  Error: getaddrinfo EAI_AGAIN llama-server
+      at ignore-listed frames {
+    errno: -3001,
+    code: 'EAI_AGAIN',
+    syscall: 'getaddrinfo',
+    hostname: 'llama-server'
+  }
+]

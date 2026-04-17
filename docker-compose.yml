@@ -19,75 +19,75 @@ services:
   # LLAMA-SERVER  — llama.cpp inference engine (CUDA)
   # Exposes OpenAI-compatible API on port 11434
   # ──────────────────────────────────────────────────────────
-  llama-server:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
-    container_name: llama-server
-    restart: unless-stopped
-    networks:
-      - ai-net
-    ports:
-      - "11434:8080"
-    volumes:
-      - ./models:/models
-    environment:
-      LLAMA_ARG_MODEL: /models/qwen3.5-9b-distilled-q5_k_m.gguf
-      LLAMA_ARG_CTX_SIZE: 131072
-      LLAMA_ARG_N_GPU_LAYERS: 99
-      LLAMA_ARG_FLASH_ATTN: 1
-      LLAMA_ARG_THINK_BUDGET: 2048
-      LLAMA_ARG_REASONING: auto
-      # K=q8_0 preserves accuracy; V=q4_0 saves ~0.5GB VRAM with negligible loss
-      LLAMA_ARG_CACHE_TYPE_K: q8_0
-      LLAMA_ARG_CACHE_TYPE_V: q4_0
-      LLAMA_ARG_N_PARALLEL: 1
-      LLAMA_ARG_PORT: 8080
-      LLAMA_ARG_HOST: 0.0.0.0
-      LLAMA_ARG_JINJA: 1
-      # Host RAM cache for repeated system-prompt prefixes (agent workflows)
-      # LLAMA_ARG_CRAM: 256
-      LLAMA_ARG_CHECKPOINT_EVERY_NT: 2048
-    command: ["--metrics"]
+  # llama-server:
+  #   image: ghcr.io/ggml-org/llama.cpp:server-cuda
+  #   container_name: llama-server
+  #   restart: unless-stopped
+  #   networks:
+  #     - ai-net
+  #   ports:
+  #     - "11434:8080"
+  #   volumes:
+  #     - ./models:/models
+  #   environment:
+  #     LLAMA_ARG_MODEL: /models/qwen3.5-9b-distilled-q5_k_m.gguf
+  #     LLAMA_ARG_CTX_SIZE: 131072
+  #     LLAMA_ARG_N_GPU_LAYERS: 99
+  #     LLAMA_ARG_FLASH_ATTN: 1
+  #     LLAMA_ARG_THINK_BUDGET: 2048
+  #     LLAMA_ARG_REASONING: auto
+  #     # K=q8_0 preserves accuracy; V=q4_0 saves ~0.5GB VRAM with negligible loss
+  #     LLAMA_ARG_CACHE_TYPE_K: q8_0
+  #     LLAMA_ARG_CACHE_TYPE_V: q4_0
+  #     LLAMA_ARG_N_PARALLEL: 1
+  #     LLAMA_ARG_PORT: 8080
+  #     LLAMA_ARG_HOST: 0.0.0.0
+  #     LLAMA_ARG_JINJA: 1
+  #     # Host RAM cache for repeated system-prompt prefixes (agent workflows)
+  #     # LLAMA_ARG_CRAM: 256
+  #     LLAMA_ARG_CHECKPOINT_EVERY_NT: 2048
+  #   command: ["--metrics"]
 
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
 
-  # ──────────────────────────────────────────────────────────
-  # LLAMA-SERVER INIT  — downloads Q5_K_M model from HuggingFace
-  # Only runs once; skips if file already exists.
-  # Source: https://huggingface.co/Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF
-  # ──────────────────────────────────────────────────────────
-  llama-server-init:
-    image: python:3.12-slim
-    container_name: llama-server-init
-    restart: "no"
-    volumes:
-      - ./models:/models
-    command:
-      - bash
-      - -c
-      - |
-        pip install -q huggingface_hub
-        python - << 'PYEOF'
-        import os, shutil
-        from huggingface_hub import hf_hub_download
-        dest = '/models/qwen3.5-9b-distilled-q5_k_m.gguf'
-        if not os.path.exists(dest):
-            print('Downloading model (~6.5GB), this will take a while...')
-            path = hf_hub_download(
-                repo_id='Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF',
-                filename='Qwen3.5-9B.Q5_K_M.gguf',
-                local_dir='/models'
-            )
-            shutil.move(path, dest)
-            print('Done.')
-        else:
-            print('Model already exists, skipping.')
-        PYEOF
+  # # ──────────────────────────────────────────────────────────
+  # # LLAMA-SERVER INIT  — downloads Q5_K_M model from HuggingFace
+  # # Only runs once; skips if file already exists.
+  # # Source: https://huggingface.co/Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF
+  # # ──────────────────────────────────────────────────────────
+  # llama-server-init:
+  #   image: python:3.12-slim
+  #   container_name: llama-server-init
+  #   restart: "no"
+  #   volumes:
+  #     - ./models:/models
+  #   command:
+  #     - bash
+  #     - -c
+  #     - |
+  #       pip install -q huggingface_hub
+  #       python - << 'PYEOF'
+  #       import os, shutil
+  #       from huggingface_hub import hf_hub_download
+  #       dest = '/models/qwen3.5-9b-distilled-q5_k_m.gguf'
+  #       if not os.path.exists(dest):
+  #           print('Downloading model (~6.5GB), this will take a while...')
+  #           path = hf_hub_download(
+  #               repo_id='Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF',
+  #               filename='Qwen3.5-9B.Q5_K_M.gguf',
+  #               local_dir='/models'
+  #           )
+  #           shutil.move(path, dest)
+  #           print('Done.')
+  #       else:
+  #           print('Model already exists, skipping.')
+  #       PYEOF
 
   # ──────────────────────────────────────────────────────────
   # N8N  — workflow automation
