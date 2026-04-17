@@ -44,9 +44,44 @@
         container: searxng
 
 - Infrastructure:
-    - Ollama:
+    - llama-server:
         icon: si-ollama
         href: http://localhost:11434
-        description: Local inference engine
+        description: Local inference engine (llama.cpp)
         server: my-docker
-        container: ollama
+        container: llama-server
+        widget:
+          type: customapi
+          url: http://llama-server:8080/props
+          refreshInterval: 30000
+          method: GET
+          mappings:
+            - field: model_alias
+              label: Model
+              format: text
+            - field: default_generation_settings.n_ctx
+              label: Context
+              format: text
+            - field: total_slots
+              label: Slots
+              format: text
+
+    - llama-server slots:
+        icon: si-ollama
+        href: http://localhost:11434/slots
+        description: Live slot activity
+        widget:
+          type: customapi
+          url: http://llama-server:8080/slots
+          refreshInterval: 5000
+          method: GET
+          mappings:
+            - field: 0.is_processing
+              label: Slot 0
+              format: text
+            - field: 1.is_processing
+              label: Slot 1
+              format: text
+            - field: 0.next_token.0.n_decoded
+              label: Last tokens
+              format: text
