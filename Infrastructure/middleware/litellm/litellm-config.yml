@@ -1,0 +1,14 @@
+model_list:
+  - model_name: Qwopus 3.5
+    litellm_params:
+      model: openai/Qwopus3.5-9B-v3.Q5_K_S
+      api_base: http://model-server:5001/v1
+      api_key: "sk-not-needed"
+
+litellm_settings:
+  drop_params: true               # ignore unsupported params instead of erroring
+  request_timeout: 600            # long timeout for 128k context generations
+  callbacks: ["otel"]
+
+environment_variables:
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4318"

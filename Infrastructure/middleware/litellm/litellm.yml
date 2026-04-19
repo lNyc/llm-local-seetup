@@ -1,0 +1,16 @@
+name: infrastructure-middleware
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    volumes:
+      - ./litellm-config.yml:/app/config.yaml
+    command: --config /app/config.yaml --port 4000
+    networks:
+      - llm-stack
+
+networks:
+  llm-stack:
+    external: true

@@ -1,0 +1,43 @@
+name: frontend-observability
+services:
+  openlit:
+    image: ghcr.io/openlit/openlit:latest
+    container_name: openlit
+    hostname: openlit
+    restart: unless-stopped
+
+    environment:
+      # ClickHouse connection — uses HTTP port (8123)
+      INIT_DB_HOST: clickhouse
+      INIT_DB_PORT: 8123
+      INIT_DB_DATABASE: ${CLICKHOUSE_DB:-default}
+      INIT_DB_USERNAME: ${CLICKHOUSE_USER:-clickhouse}
+      INIT_DB_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set in .env}
+
+      # SQLite — stores OpenLIT app state (users, sessions, settings)
+      SQLITE_DATABASE_URL: file:/app/client/data/data.db
+
+      # Auth
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET must be set in .env}
+
+      # Disable anonymous usage telemetry
+      TELEMETRY_ENABLED: "false"
+
+    volumes:
+      - openlit-data:/app/client/data
+
+    ports:
+      - "3000:3000"   # UI — only service that needs host access
+
+    networks:
+      - llm-stack
+
+volumes:
+  openlit-data:
+    name: openlit-data
+
+networks:
+  llm-stack:
+    external: true
+    name: llm-stack

@@ -1,0 +1,21 @@
+services:
+  openwebui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: openwebui
+    restart: unless-stopped
+    ports:
+      - "2601:8080"
+    volumes:
+      - openwebui-data:/app/backend/data
+    environment:
+      - OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - OPENAI_API_KEY=
+    networks:
+      - llm-stack
+
+volumes:
+  openwebui-data:
+
+networks:
+  llm-stack:
+    external: true
