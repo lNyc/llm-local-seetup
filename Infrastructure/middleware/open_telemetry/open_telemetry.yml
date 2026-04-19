@@ -1,0 +1,53 @@
+name: infrastructure-observability
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    hostname: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set in .env}
+
+    volumes:
+      - ./config.yaml:/etc/otelcol-contrib/config.yaml:ro
+
+    # No ports exposed — other containers reach this via:
+    #   otel-collector:4317  (gRPC)
+    #   otel-collector:4318  (HTTP)
+
+    networks:
+      - llm-stack
+
+  otel-gpu-collector:
+    image: ghcr.io/openlit/otel-gpu-collector:latest
+    container_name: otel-gpu-collector
+    hostname: otel-gpu-collector
+    restart: unless-stopped
+
+    environment:
+      GPU_APPLICATION_NAME: ${GPU_APPLICATION_NAME}
+      GPU_ENVIRONMENT: ${GPU_ENVIRONMENT:-local}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+    depends_on:
+      - otel-collector
+
+    networks:
+      - llm-stack
+
+networks:
+  llm-stack:
+    external: true
+    name: llm-stack

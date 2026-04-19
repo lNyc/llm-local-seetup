@@ -1,0 +1,4 @@
+name: infrastructure-database
+
+include:
+  - clickhouse/clickhouse.yml

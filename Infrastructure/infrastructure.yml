@@ -1,0 +1,6 @@
+name: infrastructure-middleware
+
+include:
+  - backend/backend.yml
+  - middleware/middleware.yml
+  - database/database.yml

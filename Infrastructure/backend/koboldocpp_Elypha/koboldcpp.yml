@@ -1,0 +1,60 @@
+name: infrastructure-backend
+
+services:
+  model-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local/koboldcpp-hybrid:latest
+    container_name: model-server
+    restart: unless-stopped
+    networks:
+      - llm-stack
+    volumes:
+      - ../models:/models
+      - ./adapters:/app/kcpp_adapters
+    command:
+      - --model
+      - /models/Qwopus3.5-9B-v3.Q5_K_S.gguf
+      - --port
+      - "5001"
+      - --host
+      - "0.0.0.0"
+
+      # ── GPU: RTX 3080 10GB (sm_86) ──────────────────────
+      - --usecuda
+      - --gpulayers
+      - "99"                    # all layers in VRAM
+
+      # ── Context / KV ────────────────────────────────────
+      - --contextsize
+      - "131072"                 # 128K
+      - --quantkv
+      - "1"                     # Q8 KV
+
+      # ── Hybrid checkpoint (recurrent state, not KV) ─────
+      - --hybridcheckpointslots
+      - "64"                    # 64 × ~50MB ≈ 3.2GB RAM — fine on 48GB
+      - --hybridcheckpointinterval
+      - "1024"
+
+      # Models Default Params
+      - '--gendefaults={"temperature":1.0,"top_p":0.95,"top_k":20,"min_p":0.0,"rep_pen":1.0,"presence_penalty":1.5,"max_length":32768}'
+      # ── Misc ────────────────────────────────────────────
+      - --skiplauncher
+      - --multiuser
+      - "1"
+      - --chatcompletionsadapter
+      - /app/kcpp_adapters/ChatML.json
+      - --jinja
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+networks:
+  llm-stack:
+    external: true

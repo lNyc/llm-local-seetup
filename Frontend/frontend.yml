@@ -1,0 +1,5 @@
+name: frontend
+
+include:
+  - open_webui/open_webui.yml
+  - openlit/openlit.yml
