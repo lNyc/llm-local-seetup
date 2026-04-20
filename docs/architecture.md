@@ -15,27 +15,29 @@ This doc explains why each layer exists, how they connect, and what would break 
 │  ┌─────────────────┐     ┌─────────────────┐                   │
 │  │   Open WebUI    │────►│    LiteLLM      │                   │
 │  │   :2601         │     │    :4000        │                   │
-│  └─────────────────┘     └───────┬─────────┘                   │
-│                                  │ OpenAI-compatible API        │
-│  ┌─────────────────┐             ▼                             │
-│  │    OpenLIT      │     ┌─────────────────┐                   │
-│  │    :3000        │     │   KoboldCPP     │                   │
-│  └────────┬────────┘     │   (hybrid-cpp)  │                   │
-│           │              │   :5001         │                   │
-│           │              └───────┬─────────┘                   │
-│           │                      │ CUDA                        │
-│           ▼                      ▼                             │
+│  └────────┬────────┘     └───────┬─────────┘                   │
+│           │                      │ OpenAI-compatible API        │
+│           │ web search           ▼                             │
+│           │              ┌─────────────────┐                   │
+│  ┌────────▼────────┐     │   KoboldCPP     │                   │
+│  │    SearXNG      │     │   (hybrid-cpp)  │                   │
+│  │    :8080        │     │   :5001         │                   │
+│  └────────┬────────┘     └───────┬─────────┘                   │
+│           │ Brave API            │ CUDA                        │
+│           ▼ (external)           ▼                             │
 │  ┌─────────────────┐           GPU                             │
-│  │   ClickHouse    │◄──────────────────────────────┐           │
-│  │   :8123 / :9000 │                               │           │
-│  └─────────────────┘     ┌─────────────────┐       │           │
-│           ▲              │ OTEL Collector  │───────┘           │
-│           └──────────────│ :4317 / :4318   │                   │
-│                          └────────▲────────┘                   │
-│                                   │                            │
-│                          ┌────────┴────────┐                   │
-│                          │ GPU Collector   │  (nvidia-smi)     │
-│                          └─────────────────┘                   │
+│  │    OpenLIT      │                                           │
+│  │    :3000        │   ┌─────────────────┐                     │
+│  └────────┬────────┘   │   ClickHouse    │◄──────────────┐    │
+│           │            │   :8123 / :9000 │               │    │
+│           └───────────►└─────────────────┘   ┌───────────┴─┐  │
+│                                               │OTEL Collector│  │
+│                                               │:4317 / :4318 │  │
+│                                               └──────▲───────┘  │
+│                                                      │          │
+│                                             ┌────────┴────────┐ │
+│                                             │ GPU Collector   │ │
+│                                             └─────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -59,9 +61,17 @@ The API proxy layer. It sits between the frontend and the model server and provi
 - **OpenTelemetry tracing** — LiteLLM emits OTEL spans for every request via its `otel` callback, giving you per-request latency and token count data without instrumenting KoboldCPP directly.
 - **Parameter normalisation** — the `drop_params: true` setting silently discards any parameters the model server doesn't support, preventing errors from clients that send OpenAI-specific fields.
 
+### SearXNG
+
+The search middleware layer. It sits between all search consumers (Open WebUI, n8n agents) and the upstream search backend, providing a single consistent JSON API endpoint on `searxng:8080`.
+
+The primary engine is Brave's scraping engine — free, no API key, Brave's own index. A secondary `braveapi` engine is configured but token-gated: it only activates when a caller includes the `SEARXNG_BRAVEAPI_TOKEN` in the request, acting as an explicit paid fallback that agents can escalate to when the scraper fails or returns poor results.
+
+SearXNG is not exposed to the host — it is internal middleware, not a user-facing service. The UI it ships with is inaccessible from outside the `llm-stack` network and unused by any service in the stack.
+
 ### Open WebUI
 
-The chat interface. Connects to LiteLLM as its OpenAI backend. Handles conversation history, system prompts, and user sessions locally — none of that data leaves the machine.
+The chat interface. Connects to LiteLLM as its OpenAI backend and to SearXNG for web search. Handles conversation history, system prompts, and user sessions locally — none of that data leaves the machine.
 
 ### OpenLIT
 
@@ -94,7 +104,8 @@ docker-compose.yml
 │   │   └── koboldocpp_Elypha/koboldcpp.yml
 │   ├── middleware/middleware.yml
 │   │   ├── litellm/litellm.yml
-│   │   └── open_telemetry/open_telemetry.yml
+│   │   ├── open_telemetry/open_telemetry.yml
+│   │   └── searxng/searxng.yml
 │   └── database/database.yml
 │       └── clickhouse/clickhouse.yml
 └── Frontend/frontend.yml
@@ -120,7 +131,9 @@ Only two services expose ports to the host:
 - **Open WebUI** on `2601`
 - **OpenLIT** on `3000`
 
-Everything else is internal — LiteLLM, KoboldCPP, ClickHouse, and the OTEL collector are reachable only from within the `llm-stack` network.
+Everything else is internal — LiteLLM, KoboldCPP, SearXNG, ClickHouse, and the OTEL collector are reachable only from within the `llm-stack` network.
+
+SearXNG makes outbound requests to Brave Search (scraper or API) depending on the query. These are egress-only — no inbound exposure.
 
 ---
 
@@ -138,6 +151,19 @@ Everything else is internal — LiteLLM, KoboldCPP, ClickHouse, and the OTEL col
 9. OpenLIT reads from ClickHouse and updates the dashboard
 ```
 
+## Data Flow: Web Search Request
+
+```
+1. Open WebUI triggers a web search (user toggled search, or query rewrite fired)
+2. Open WebUI GETs searxng:8080/search?q=<query>&format=json
+3. SearXNG queries Brave scraper → returns ranked results
+4. If the agent determines results are poor:
+   a. Agent retries with &tokens=<SEARXNG_BRAVEAPI_TOKEN>
+   b. SearXNG activates braveapi engine → calls Brave Search API
+5. Results returned to caller as JSON
+6. Open WebUI injects top results into the LLM context via RAG pipeline
+```
+
 ---
 
 ## What Happens If You Remove a Layer
@@ -146,6 +172,7 @@ Everything else is internal — LiteLLM, KoboldCPP, ClickHouse, and the OTEL col
 |---|---|
 | **LiteLLM** | Open WebUI has no backend — all inference stops |
 | **KoboldCPP** | LiteLLM has nothing to route to — inference stops |
+| **SearXNG** | Web search stops for Open WebUI and n8n agents — inference continues |
 | **OTEL Collector** | Traces and GPU metrics stop being collected — inference continues |
 | **otel-gpu-collector** | GPU metrics stop — inference and traces continue |
 | **ClickHouse** | Telemetry can't be stored — OpenLIT goes down, inference continues |

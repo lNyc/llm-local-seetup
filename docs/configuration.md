@@ -75,6 +75,50 @@ Used by: `otel-gpu-collector`
 
 ---
 
+### Search
+
+#### `SEARXNG_SECRET_KEY`
+**Required.** Used by SearXNG internally to sign sessions and cookies.
+
+Generate a strong random value:
+```bash
+openssl rand -hex 32
+```
+
+Used by: `searxng`
+
+---
+
+#### `BRAVE_API_KEY`
+**Optional.** API key for the Brave Search API, used by the `braveapi` engine in SearXNG.
+
+The `braveapi` engine is token-gated and inactive by default — the stack runs fine without this key, using the Brave scraping engine instead. Add this key only when you need the paid API fallback (i.e. the scraper is being blocked or rate-limited).
+
+Obtain a key at [api.search.brave.com](https://api.search.brave.com). The free tier provides 2,000 requests/month with no credit card required.
+
+Used by: `searxng` (braveapi engine only)
+
+---
+
+#### `SEARXNG_BRAVEAPI_TOKEN`
+**Optional.** A shared secret that gates access to the `braveapi` engine in SearXNG.
+
+Any caller that includes this token in a search request activates the paid Brave API engine instead of the free scraper. Callers without the token always use the scraper. This lets n8n agents explicitly escalate to the paid backend when scraper results are poor, while Open WebUI always uses the free path.
+
+Generate a strong random value:
+```bash
+openssl rand -hex 32
+```
+
+To use from n8n or any HTTP caller, append to the search URL:
+```
+http://searxng:8080/search?q=<query>&format=json&tokens=<your-token>
+```
+
+Used by: `searxng`
+
+---
+
 ### Not Yet Wired Up
 
 These variables exist in `.env.example` but are not currently referenced by any Compose file or service config. They're placeholders for future parameterisation of the backend.
@@ -107,6 +151,14 @@ The absolute minimum to get the stack running:
 NEXTAUTH_SECRET=<generated-secret>
 CLICKHOUSE_PASSWORD=<strong-password>
 GPU_APPLICATION_NAME=llm-local-setup
+SEARXNG_SECRET_KEY=<generated-secret>
+```
+
+To enable the paid search fallback, also add:
+
+```env
+BRAVE_API_KEY=<your-brave-api-key>
+SEARXNG_BRAVEAPI_TOKEN=<generated-secret>
 ```
 
 All other variables have defaults that work out of the box.
@@ -116,5 +168,6 @@ All other variables have defaults that work out of the box.
 ## Security Notes
 
 - `.env` is listed in `.gitignore` — it will never be committed. Do not override this.
-- `CLICKHOUSE_PASSWORD` and `NEXTAUTH_SECRET` should be treated as credentials. Don't reuse passwords from other services.
+- `CLICKHOUSE_PASSWORD`, `NEXTAUTH_SECRET`, `SEARXNG_SECRET_KEY`, and `SEARXNG_BRAVEAPI_TOKEN` should be treated as credentials. Don't reuse passwords from other services.
+- `SEARXNG_BRAVEAPI_TOKEN` controls access to the paid Brave API engine. Anyone who knows this token can trigger paid API calls — keep it out of logs and client-side code.
 - No service in this stack is intended to be exposed to the public internet. If you expose ports externally, add authentication in front of Open WebUI and restrict ClickHouse access.
