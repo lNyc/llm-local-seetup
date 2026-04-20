@@ -2,33 +2,39 @@
 
 # Next Steps
 
+## Extraction Pipeline
+
+Neo4j and Qdrant are in the stack, but they're empty. Something needs to read documents, extract entities and relationships, and write them into Neo4j — and chunk and embed content into Qdrant. The retrieval layer is ready; the ingestion side is not.
+
+**LightRAG** is the most direct path: it handles extraction using your existing LiteLLM endpoint (pointing at KoboldCPP), writes the knowledge graph into Neo4j, and manages the vector index. No separate embedding service or extraction model required — the local 9B model does the work at indexing time, not at query time.
+
+The alternative is a CPU-based NLP pipeline (spaCy + GLiNER) for entity extraction if you'd rather not spend inference budget on indexing. Less flexible but faster and fully deterministic.
+
+---
+
+## Agentic Orchestration Layer
+
+Open WebUI is a chat loop, not an agent runtime. To do anything multi-step — search, retrieve from Qdrant, traverse Neo4j, write code, run it, interpret the result, iterate — you need a layer that can chain tool calls across turns with branching logic and retries.
+
+Neo4j (graph traversal) and Qdrant (vector search) are both available on `llm-stack` and ready to be registered as tools. The orchestration layer needs to point at LiteLLM as its model backend and expose Neo4j, Qdrant, SearXNG, and any future sandbox as callable tools.
+
+---
+
 ## Code Execution Sandbox
 
 Agents can suggest and write code but have nowhere to run it. Without real execution, correctness is unverified — you're reading output, not testing it. Pick a sandboxed runtime that agents can invoke as a tool and get stdout/stderr back.
 
 ---
 
-## Agentic Orchestration Layer
-
-Open WebUI is a chat loop, not an agent runtime. To do anything multi-step — search, read, write code, run it, interpret the result, iterate — you need a layer that can chain tool calls across turns with branching logic and retries. Pick something that can talk to LiteLLM as its model backend and to SearXNG, the sandbox, and the vector store as its tools.
-
----
-
-## Vector Store / Retrieval Layer
-
-Every conversation starts blank. There is no memory of past debugging sessions, architectural decisions, or reference material you've already worked through. A vector store with a retrieval layer fixes this — embed and index whatever matters, query it on demand, inject relevant chunks into context automatically.
-
----
-
 ## Codebase Ingestion Pipeline
 
-Pasting files into chat doesn't scale. You need a pipeline that takes a repository, chunks and embeds it, and loads it into the vector store so agents can do semantic search over code rather than receiving a raw file dump.
+Pasting files into chat doesn't scale. You need a pipeline that takes a repository, chunks and embeds it into Qdrant, and extracts structural entities (modules, functions, dependencies, call relationships) into Neo4j so agents can do semantic search over code and graph traversal over its structure — rather than receiving a raw file dump.
 
 ---
 
 ## Document Ingestion Pipeline
 
-Same problem for unstructured inputs — RFCs, architecture write-ups, blog posts saved as PDF, your own notes. A separate or shared ingestion pipeline that handles these formats and routes them into the retrieval layer.
+Same problem for unstructured inputs — RFCs, architecture write-ups, blog posts saved as PDF, your own notes. A pipeline that handles these formats, embeds content into Qdrant, and extracts key concepts and their relationships into Neo4j — feeding both retrieval layers from a single ingestion pass.
 
 ---
 

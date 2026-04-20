@@ -9,36 +9,36 @@ This doc explains why each layer exists, how they connect, and what would break 
 ## Layer Map
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         llm-stack (Docker network)              │
-│                                                                 │
-│  ┌─────────────────┐     ┌─────────────────┐                   │
-│  │   Open WebUI    │────►│    LiteLLM      │                   │
-│  │   :2601         │     │    :4000        │                   │
-│  └────────┬────────┘     └───────┬─────────┘                   │
-│           │                      │ OpenAI-compatible API        │
-│           │ web search           ▼                             │
-│           │              ┌─────────────────┐                   │
-│  ┌────────▼────────┐     │   KoboldCPP     │                   │
-│  │    SearXNG      │     │   (hybrid-cpp)  │                   │
-│  │    :8080        │     │   :5001         │                   │
-│  └────────┬────────┘     └───────┬─────────┘                   │
-│           │ Brave API            │ CUDA                        │
-│           ▼ (external)           ▼                             │
-│  ┌─────────────────┐           GPU                             │
-│  │    OpenLIT      │                                           │
-│  │    :3000        │   ┌─────────────────┐                     │
-│  └────────┬────────┘   │   ClickHouse    │◄──────────────┐    │
-│           │            │   :8123 / :9000 │               │    │
-│           └───────────►└─────────────────┘   ┌───────────┴─┐  │
-│                                               │OTEL Collector│  │
-│                                               │:4317 / :4318 │  │
-│                                               └──────▲───────┘  │
-│                                                      │          │
-│                                             ┌────────┴────────┐ │
-│                                             │ GPU Collector   │ │
-│                                             └─────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         llm-stack (Docker network)                   │
+│                                                                      │
+│  ┌─────────────────┐     ┌─────────────────┐                         │
+│  │   Open WebUI    │────►│    LiteLLM      │                         │
+│  │   :2601         │     │    :4000        │                         │
+│  └───────┬─────────┘     └───────┬─────────┘                         │
+│          │ vector search          │ OpenAI-compatible API            │
+│          │ (RAG)                  ▼                                  │
+│  ┌───────▼─────────┐   ┌─────────────────┐                           │
+│  │     Qdrant      │   │   KoboldCPP     │                           │
+│  │     :6333       │   │   (hybrid-cpp)  │                           │
+│  └─────────────────┘   │   :5001         │                           │
+│                         └───────┬─────────┘                          │
+│  ┌─────────────────┐            │ CUDA                               │
+│  │     Neo4j       │            ▼                                    │
+│  │     :7687       │           GPU                                   │
+│  └─────────────────┘                                                 │
+│          ↑                                                           │
+│   (pending agent layer)                                              │
+│                                                                      │
+│  ┌──────────┐   ┌──────────────────┐   ┌────────────────────────┐    │
+│  │  OpenLIT │◄──│    ClickHouse    │◄──│    OTEL Collector      │    │
+│  │  :3000   │   │ :8123 / :9000    │   │  :4317 / :4318         │    │
+│  └──────────┘   └──────────────────┘   └──────────▲─────────────┘    │
+│                                                    │                 │
+│                                          ┌─────────┴───────┐         │
+│                                          │  GPU Collector  │         │
+│                                          └─────────────────┘         │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -63,15 +63,31 @@ The API proxy layer. It sits between the frontend and the model server and provi
 
 ### SearXNG
 
-The search middleware layer. It sits between all search consumers (Open WebUI, n8n agents) and the upstream search backend, providing a single consistent JSON API endpoint on `searxng:8080`.
+The search middleware layer. It sits between all search consumers (Open WebUI, agents) and the upstream search backend, providing a single consistent JSON API endpoint on `searxng:8080`.
 
 The primary engine is Brave's scraping engine — free, no API key, Brave's own index. A secondary `braveapi` engine is configured but token-gated: it only activates when a caller includes the `SEARXNG_BRAVEAPI_TOKEN` in the request, acting as an explicit paid fallback that agents can escalate to when the scraper fails or returns poor results.
 
-SearXNG is not exposed to the host — it is internal middleware, not a user-facing service. The UI it ships with is inaccessible from outside the `llm-stack` network and unused by any service in the stack.
+SearXNG is not exposed to the host — it is internal middleware, not a user-facing service.
 
 ### Open WebUI
 
-The chat interface. Connects to LiteLLM as its OpenAI backend and to SearXNG for web search. Handles conversation history, system prompts, and user sessions locally — none of that data leaves the machine.
+The chat interface. Connects to LiteLLM as its OpenAI backend, to SearXNG for web search, and to Qdrant for vector-based RAG document retrieval. Handles conversation history, system prompts, and user sessions locally — none of that data leaves the machine.
+
+### Qdrant
+
+The vector store. Handles semantic similarity search for RAG — when you upload a document in Open WebUI, it gets chunked, embedded, and stored in Qdrant. At query time, Open WebUI retrieves the most semantically relevant chunks and injects them into the LLM context.
+
+Qdrant is a Rust-based purpose-built vector database. It runs entirely on CPU, has no GPU dependency, and uses HNSW indexing for fast approximate nearest-neighbour search. Memory footprint is low (~200 MB at rest) — it does not compete with KoboldCPP for VRAM or significant RAM.
+
+Qdrant is not exposed to the host — only Open WebUI talks to it directly. Future agent layers will also query it for retrieval.
+
+### Neo4j
+
+The knowledge graph store. Stores entities as nodes and relationships as edges, enabling multi-hop traversal queries that vector similarity search cannot answer — "what depends on X?", "how are concept A and concept B connected?", "what are all the components that interact with service Y?".
+
+Neo4j is not connected to anything in the current stack beyond being present on the `llm-stack` network. It is waiting for the extraction pipeline and agent layer: once those exist, an agent will write entities and relationships into Neo4j during document ingestion (via a tool like LightRAG pointing at the LiteLLM endpoint), and query it at inference time alongside Qdrant.
+
+Neo4j Community edition runs with a JVM backend. Memory is bounded explicitly via environment variables (`server.memory.heap.max_size`, `server.memory.pagecache_size`) to keep it within its 2 GB container limit and avoid competing with KoboldCPP.
 
 ### OpenLIT
 
@@ -107,7 +123,9 @@ docker-compose.yml
 │   │   ├── open_telemetry/open_telemetry.yml
 │   │   └── searxng/searxng.yml
 │   └── database/database.yml
-│       └── clickhouse/clickhouse.yml
+│       ├── clickhouse/clickhouse.yml
+│       ├── neo4j/neo4j.yml
+│       └── qdrant/qdrant.yml
 └── Frontend/frontend.yml
     ├── open_webui/open_webui.yml
     └── openlit/openlit.yml
@@ -131,9 +149,7 @@ Only two services expose ports to the host:
 - **Open WebUI** on `2601`
 - **OpenLIT** on `3000`
 
-Everything else is internal — LiteLLM, KoboldCPP, SearXNG, ClickHouse, and the OTEL collector are reachable only from within the `llm-stack` network.
-
-SearXNG makes outbound requests to Brave Search (scraper or API) depending on the query. These are egress-only — no inbound exposure.
+Everything else is internal — LiteLLM, KoboldCPP, SearXNG, Qdrant, Neo4j, ClickHouse, and the OTEL collector are reachable only from within the `llm-stack` network.
 
 ---
 
@@ -151,6 +167,17 @@ SearXNG makes outbound requests to Brave Search (scraper or API) depending on th
 9. OpenLIT reads from ClickHouse and updates the dashboard
 ```
 
+## Data Flow: RAG Request
+
+```
+1. User uploads a document in Open WebUI
+2. Open WebUI chunks and embeds the document
+3. Embeddings are stored in Qdrant at qdrant:6333
+4. User sends a query — Open WebUI retrieves relevant chunks from Qdrant
+5. Chunks are injected into the LLM context
+6. Request proceeds as a normal inference request via LiteLLM
+```
+
 ## Data Flow: Web Search Request
 
 ```
@@ -164,6 +191,22 @@ SearXNG makes outbound requests to Brave Search (scraper or API) depending on th
 6. Open WebUI injects top results into the LLM context via RAG pipeline
 ```
 
+## Data Flow: Knowledge Graph (pending agent layer)
+
+```
+Ingestion:
+1. Agent receives a document
+2. Agent calls LiteLLM to extract entities and relationships (via LightRAG or similar)
+3. Extracted graph is written into Neo4j at neo4j:7687
+
+Query:
+1. Agent receives a user query
+2. Agent queries Neo4j for entity relationships (graph traversal)
+3. Agent queries Qdrant for semantically similar chunks (vector search)
+4. Both results are combined and injected into the LLM context
+5. Request proceeds via LiteLLM
+```
+
 ---
 
 ## What Happens If You Remove a Layer
@@ -172,7 +215,9 @@ SearXNG makes outbound requests to Brave Search (scraper or API) depending on th
 |---|---|
 | **LiteLLM** | Open WebUI has no backend — all inference stops |
 | **KoboldCPP** | LiteLLM has nothing to route to — inference stops |
-| **SearXNG** | Web search stops for Open WebUI and n8n agents — inference continues |
+| **Qdrant** | RAG document retrieval stops — inference continues, uploaded docs lose their index |
+| **Neo4j** | Knowledge graph unavailable — no impact until agent layer exists |
+| **SearXNG** | Web search stops — inference continues |
 | **OTEL Collector** | Traces and GPU metrics stop being collected — inference continues |
 | **otel-gpu-collector** | GPU metrics stop — inference and traces continue |
 | **ClickHouse** | Telemetry can't be stored — OpenLIT goes down, inference continues |
