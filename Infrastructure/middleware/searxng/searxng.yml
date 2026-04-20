@@ -1,0 +1,38 @@
+name: infrastructure-middleware
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    hostname: searxng
+    restart: unless-stopped
+
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080
+      BRAVE_API_KEY: ${BRAVE_API_KEY:?BRAVE_API_KEY must be set in .env}
+
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+    # No host port — internal only
+    # Consumers reach this via searxng:8080 on llm-stack
+
+    networks:
+      - llm-stack
+
+networks:
+  llm-stack:
+    external: true
+    name: llm-stack

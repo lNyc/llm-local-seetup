@@ -1,0 +1,43 @@
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - brave api
+
+general:
+  debug: false
+  instance_name: "llm-stack-search"
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: "${SEARXNG_SECRET_KEY}"
+  limiter: false
+  image_proxy: false
+  forwarding_allow_ips: "*"
+
+engines:
+  - name: duckduckgo
+    engine: duckduckgo
+    shortcut: ddg
+    categories: [general, web]
+
+  - name: brave
+    engine: brave
+    shortcut: br
+    categories: [general, web]
+    brave_category: search
+
+  - name: brave api
+    engine: braveapi
+    api_key: "${BRAVE_API_KEY}"
+    results_per_page: 20
+    categories: [general, web]
+    tokens: ["${SEARXNG_BRAVEAPI_TOKEN}"]
+    inactive: false

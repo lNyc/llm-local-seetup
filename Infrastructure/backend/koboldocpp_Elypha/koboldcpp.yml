@@ -49,6 +49,8 @@ services:
       - --jinja
     deploy:
       resources:
+        limits:
+          memory: 12g
         reservations:
           devices:
             - driver: nvidia
