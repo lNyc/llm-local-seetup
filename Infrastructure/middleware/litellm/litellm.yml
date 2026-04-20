@@ -8,6 +8,10 @@ services:
     volumes:
       - ./litellm-config.yml:/app/config.yaml
     command: --config /app/config.yaml --port 4000
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     networks:
       - llm-stack
 

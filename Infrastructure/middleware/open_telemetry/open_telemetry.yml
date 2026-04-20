@@ -15,6 +15,11 @@ services:
     volumes:
       - ./config.yaml:/etc/otelcol-contrib/config.yaml:ro
 
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
     # No ports exposed — other containers reach this via:
     #   otel-collector:4317  (gRPC)
     #   otel-collector:4318  (HTTP)
@@ -35,6 +40,8 @@ services:
 
     deploy:
       resources:
+        limits:
+          memory: 128m
         reservations:
           devices:
             - driver: nvidia

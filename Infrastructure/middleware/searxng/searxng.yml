@@ -21,6 +21,11 @@ services:
       - SETGID
       - SETUID
 
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
     # No host port — internal only
     # Consumers reach this via searxng:8080 on llm-stack
 

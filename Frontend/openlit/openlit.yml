@@ -30,6 +30,11 @@ services:
     ports:
       - "3000:3000"   # UI — only service that needs host access
 
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
     networks:
       - llm-stack
 
