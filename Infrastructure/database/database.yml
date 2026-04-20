@@ -2,3 +2,5 @@ name: infrastructure-database
 
 include:
   - clickhouse/clickhouse.yml
+  - neo4j/neo4j.yml
+  - qdrant/qdrant.yml

@@ -2,7 +2,7 @@
 
 > Self-hosted LLM stack with observability, built for consumer GPUs.
 
-Runs a full local inference pipeline — model server, API proxy, chat UI, and GPU-aware observability — entirely in Docker. No cloud dependencies, no API keys required for inference.
+Runs a full local inference pipeline — model server, API proxy, chat UI, vector store, knowledge graph, and GPU-aware observability — entirely in Docker. No cloud dependencies, no API keys required for inference.
 
 ---
 
@@ -15,6 +15,8 @@ Runs a full local inference pipeline — model server, API proxy, chat UI, and G
 | **Frontend** | [Open WebUI](https://github.com/open-webui/open-webui) | Chat interface |
 | **Observability** | [OpenLIT](https://github.com/openlit/openlit) | LLM observability dashboard |
 | **Telemetry** | [OpenTelemetry Collector](https://opentelemetry.io/docs/collector/) | Trace/metric/log pipeline |
+| **Vector store** | [Qdrant](https://qdrant.tech/) | Semantic similarity search and RAG document storage |
+| **Graph store** | [Neo4j](https://neo4j.com/) | Knowledge graph — entities, relationships, multi-hop traversal |
 | **Database** | [ClickHouse](https://clickhouse.com/) | Telemetry storage backend |
 
 ---
@@ -22,30 +24,43 @@ Runs a full local inference pipeline — model server, API proxy, chat UI, and G
 ## Architecture
 
 ```
-                         ┌─────────────────────────────────────────────┐
-                         │                  llm-stack                   │
-                         │                                              │
-          Browser        │   ┌──────────┐      ┌──────────────────┐    │
-        ──────────────►  │   │ Open WebUI│────► │     LiteLLM      │    │
-         :2601           │   └──────────┘      └────────┬─────────┘    │
-                         │                              │               │
-          Browser        │   ┌──────────┐              ▼               │
-        ──────────────►  │   │  OpenLIT │    ┌──────────────────┐      │
-         :3000           │   └────┬─────┘    │   KoboldCPP      │      │
-                         │        │          │  (hybrid-cpp)     │      │
-                         │        │          └────────┬─────────┘      │
-                         │        ▼                   │                │
-                         │   ┌──────────┐             │ CUDA           │
-                         │   │ClickHouse│◄────────┐   ▼               │
-                         │   └──────────┘         │  GPU              │
-                         │        ▲               │                    │
-                         │   ┌────┴─────────┐     │                   │
-                         │   │ OTEL Collector│◄────┘  (GPU metrics)    │
-                         │   └──────────────┘                         │
-                         └─────────────────────────────────────────────┘
+                         ┌──────────────────────────────────────────────────┐
+                         │                    llm-stack                      │
+                         │                                                   │
+          Browser        │   ┌──────────┐      ┌──────────────────┐         │
+        ──────────────►  │   │ Open WebUI│────► │     LiteLLM      │         │
+         :2601           │   └─────┬────┘      └────────┬─────────┘         │
+                         │         │ (RAG)              │                    │
+          Browser        │         ▼                    ▼                    │
+        ──────────────►  │   ┌──────────┐    ┌──────────────────┐           │
+         :3000           │   │  Qdrant  │    │   KoboldCPP      │           │
+                         │   └──────────┘    │  (hybrid-cpp)    │           │
+                         │                   └────────┬─────────┘           │
+                         │   ┌──────────┐             │ CUDA                │
+                         │   │  Neo4j   │             ▼                     │
+                         │   └──────────┘            GPU                    │
+                         │         ↑                  │                     │
+                         │    (pending agent layer)   │                     │
+                         │                            │                     │
+                         │   ┌──────────┐             │                     │
+                         │   │  OpenLIT │◄──────────────────────────┐       │
+                         │   └────┬─────┘                           │       │
+                         │        ▼                                 │       │
+                         │   ┌──────────┐   ┌──────────────────┐   │       │
+                         │   │ClickHouse│◄──│  OTEL Collector  │◄──┘       │
+                         │   └──────────┘   └────────▲─────────┘           │
+                         │                           │                      │
+                         │                  ┌────────┴────────┐             │
+                         │                  │  GPU Collector  │             │
+                         │                  └─────────────────┘             │
+                         └──────────────────────────────────────────────────┘
 ```
 
 Inference path: **Open WebUI → LiteLLM → KoboldCPP → GPU**
+
+RAG path: **Open WebUI → Qdrant** (vector similarity search)
+
+Graph path: **Agent → Neo4j** (knowledge graph traversal — pending agent layer)
 
 Observability path: **KoboldCPP + GPU collector → OTEL Collector → ClickHouse → OpenLIT**
 
@@ -92,7 +107,7 @@ docker network create llm-stack
 ```bash
 cp .env.example .env
 ```
-Open `.env` and fill in the required values — at minimum `CLICKHOUSE_PASSWORD` and `NEXTAUTH_SECRET`. See [`docs/configuration.md`](docs/configuration.md) for a full variable reference.
+Open `.env` and fill in the required values — at minimum `CLICKHOUSE_PASSWORD`, `NEXTAUTH_SECRET`, and `NEO4J_PASSWORD`. See [`docs/configuration.md`](docs/configuration.md) for a full variable reference.
 
 **4. Drop in your model**
 ```bash
@@ -124,12 +139,14 @@ The first run builds the KoboldCPP image and pulls all other images. This takes 
 | OpenLIT | `3000` | `openlit:3000` | Observability dashboard |
 | LiteLLM | — | `litellm:4000` | API proxy (internal only) |
 | KoboldCPP | — | `model-server:5001` | Model inference (internal only) |
+| Qdrant | — | `qdrant:6333` | Vector store HTTP (internal only) |
+| Neo4j | — | `neo4j:7687` | Knowledge graph Bolt (internal only) |
 | ClickHouse HTTP | — | `clickhouse:8123` | DB HTTP API (internal only) |
 | ClickHouse TCP | — | `clickhouse:9000` | DB native protocol (internal only) |
 | OTEL Collector gRPC | — | `otel-collector:4317` | Telemetry ingress (internal only) |
 | OTEL Collector HTTP | — | `otel-collector:4318` | Telemetry ingress (internal only) |
 
-LiteLLM, KoboldCPP, ClickHouse, and the OTEL collector are intentionally not exposed to the host — all traffic flows through the `llm-stack` Docker network.
+LiteLLM, KoboldCPP, Qdrant, Neo4j, ClickHouse, and the OTEL collector are intentionally not exposed to the host — all traffic flows through the `llm-stack` Docker network.
 
 ---
 
@@ -139,7 +156,7 @@ LiteLLM, KoboldCPP, ClickHouse, and the OTEL collector are intentionally not exp
 docker compose down
 ```
 
-To also remove volumes (wipes all data including chat history and telemetry):
+To also remove volumes (wipes all data including chat history, vector store, knowledge graph, and telemetry):
 ```bash
 docker compose down -v
 ```

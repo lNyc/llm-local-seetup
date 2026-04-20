@@ -1,0 +1,38 @@
+name: infrastructure-database
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    hostname: qdrant
+    restart: unless-stopped
+
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+    # No host ports — internal only
+    # Consumers reach this via qdrant:6333 (HTTP) on llm-stack
+
+    networks:
+      - llm-stack
+
+volumes:
+  qdrant-data:
+    name: qdrant-data
+
+networks:
+  llm-stack:
+    external: true
+    name: llm-stack
